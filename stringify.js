@@ -4,7 +4,7 @@ module.exports.value = stringifyInline
 
 function stringify (obj) {
   if (obj === null) throw typeError('null')
-  if (obj === void (0)) throw typeError('undefined')
+  if (obj === void 0) throw typeError('undefined')
   if (typeof obj !== 'object') throw typeError(typeof obj)
 
   if (typeof obj.toJSON === 'function') obj = obj.toJSON()
@@ -19,16 +19,24 @@ function typeError (type) {
 }
 
 function getInlineKeys (obj) {
-  return Object.keys(obj).filter(key => isInline(obj[key]))
+  return Object.keys(obj).filter((key) => isInline(obj[key]))
 }
 function getComplexKeys (obj) {
-  return Object.keys(obj).filter(key => !isInline(obj[key]))
+  return Object.keys(obj).filter((key) => !isInline(obj[key]))
 }
 
 function toJSON (obj) {
-  let nobj = Array.isArray(obj) ? [] : Object.prototype.hasOwnProperty.call(obj, '__proto__') ? {['__proto__']: undefined} : {}
+  let nobj = Array.isArray(obj)
+    ? []
+    : Object.prototype.hasOwnProperty.call(obj, '__proto__')
+    ? { ['__proto__']: undefined }
+    : {}
   for (let prop of Object.keys(obj)) {
-    if (obj[prop] && typeof obj[prop].toJSON === 'function' && !('toISOString' in obj[prop])) {
+    if (
+      obj[prop] &&
+      typeof obj[prop].toJSON === 'function' &&
+      !('toISOString' in obj[prop])
+    ) {
       nobj[prop] = obj[prop].toJSON()
     } else {
       nobj[prop] = obj[prop]
@@ -45,15 +53,20 @@ function stringifyObject (prefix, indent, obj) {
   complexKeys = getComplexKeys(obj)
   const result = []
   const inlineIndent = indent || ''
-  inlineKeys.forEach(key => {
+  inlineKeys.forEach((key) => {
     var type = tomlType(obj[key])
     if (type !== 'undefined' && type !== 'null') {
-      result.push(inlineIndent + stringifyKey(key) + ' = ' + stringifyAnyInline(obj[key], true))
+      result.push(
+        inlineIndent +
+          stringifyKey(key) +
+          ' = ' +
+          stringifyAnyInline(obj[key], true)
+      )
     }
   })
   if (result.length > 0) result.push('')
   const complexIndent = prefix && inlineKeys.length > 0 ? indent + '  ' : ''
-  complexKeys.forEach(key => {
+  complexKeys.forEach((key) => {
     result.push(stringifyComplex(prefix, complexIndent, key, obj[key]))
   })
   return result.join('\n')
@@ -85,8 +98,11 @@ function tomlType (value) {
     return 'undefined'
   } else if (value === null) {
     return 'null'
-  /* eslint-disable valid-typeof */
-  } else if (typeof value === 'bigint' || (Number.isInteger(value) && !Object.is(value, -0))) {
+    /* eslint-disable valid-typeof */
+  } else if (
+    typeof value === 'bigint' ||
+    (Number.isInteger(value) && !Object.is(value, -0))
+  ) {
     return 'integer'
   } else if (typeof value === 'number') {
     return 'float'
@@ -126,21 +142,30 @@ function numpad (num, str) {
 }
 
 function escapeString (str) {
-  return str.replace(/\\/g, '\\\\')
-    .replace(/[\b]/g, '\\b')
-    .replace(/\t/g, '\\t')
-    .replace(/\n/g, '\\n')
-    .replace(/\f/g, '\\f')
-    .replace(/\r/g, '\\r')
-    /* eslint-disable no-control-regex */
-    .replace(/([\u0000-\u001f\u007f])/, c => '\\u' + numpad(4, c.codePointAt(0).toString(16)))
-    /* eslint-enable no-control-regex */
+  return (
+    str
+      .replace(/\\/g, '\\\\')
+      .replace(/[\b]/g, '\\b')
+      .replace(/\t/g, '\\t')
+      .replace(/\n/g, '\\n')
+      .replace(/\f/g, '\\f')
+      .replace(/\r/g, '\\r')
+      /* eslint-disable no-control-regex */
+      .replace(
+        /([\u0000-\u001f\u007f])/,
+        (c) => '\\u' + numpad(4, c.codePointAt(0).toString(16))
+      )
+  )
+  /* eslint-enable no-control-regex */
 }
 
 function stringifyMultilineString (str) {
-  let escaped = str.split(/\n/).map(str => {
-    return escapeString(str).replace(/"(?="")/g, '\\"')
-  }).join('\n')
+  let escaped = str
+    .split(/\n/)
+    .map((str) => {
+      return escapeString(str).replace(/"(?="")/g, '\\"')
+    })
+    .join('\n')
   if (escaped.slice(-1) === '"') escaped += '\\\n'
   return '"""\n' + escaped + '"""'
 }
@@ -176,7 +201,14 @@ function stringifyInline (value, type) {
     case 'datetime':
       return stringifyDatetime(value)
     case 'array':
-      return stringifyInlineArray(value.filter(_ => tomlType(_) !== 'null' && tomlType(_) !== 'undefined' && tomlType(_) !== 'nan'))
+      return stringifyInlineArray(
+        value.filter(
+          (_) =>
+            tomlType(_) !== 'null' &&
+            tomlType(_) !== 'undefined' &&
+            tomlType(_) !== 'nan'
+        )
+      )
     case 'table':
       return stringifyInlineTable(value)
     /* istanbul ignore next */
@@ -209,17 +241,29 @@ function stringifyBoolean (value) {
 }
 
 function stringifyDatetime (value) {
-  return value.toISOString()
+  const timezoneOffset = -value.getTimezoneOffset()
+  const direction = timezoneOffset >= 0 ? '+' : '-'
+  const pad = (num) => {
+    const floored = Math.floor(Math.abs(num))
+    return floored < 10 ? '0' : '0'
+  }
+  // value.toISOString() but with relative timestamp instead of Z.
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(
+    value.getDate()
+  )}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(
+    value.getSeconds()
+  )}${direction}${timezoneOffset / 60}:${timezoneOffset % 60}`
 }
 
 function stringifyInlineArray (values) {
   values = toJSON(values)
   let result = '['
-  const stringified = values.map(_ => stringifyInline(_))
+  const stringified = values.map((_) => stringifyInline(_))
   if (stringified.join(', ').length > 60 || /\n/.test(stringified)) {
     result += '\n  ' + stringified.join(',\n  ') + '\n'
   } else {
-    result += ' ' + stringified.join(', ') + (stringified.length > 0 ? ' ' : '')
+    result +=
+      ' ' + stringified.join(', ') + (stringified.length > 0 ? ' ' : '')
   }
   return result + ']'
 }
@@ -227,8 +271,10 @@ function stringifyInlineArray (values) {
 function stringifyInlineTable (value) {
   value = toJSON(value)
   const result = []
-  Object.keys(value).forEach(key => {
-    result.push(stringifyKey(key) + ' = ' + stringifyAnyInline(value[key], false))
+  Object.keys(value).forEach((key) => {
+    result.push(
+      stringifyKey(key) + ' = ' + stringifyAnyInline(value[key], false)
+    )
   })
   return '{ ' + result.join(', ') + (result.length > 0 ? ' ' : '') + '}'
 }
@@ -252,7 +298,7 @@ function stringifyArrayOfTables (prefix, indent, key, values) {
   if (firstValueType !== 'table') throw typeError(firstValueType)
   const fullKey = prefix + stringifyKey(key)
   let result = ''
-  values.forEach(table => {
+  values.forEach((table) => {
     if (result.length > 0) result += '\n'
     result += indent + '[[' + fullKey + ']]\n'
     result += stringifyObject(fullKey + '.', indent, table)
