@@ -241,18 +241,20 @@ function stringifyBoolean (value) {
 }
 
 function stringifyDatetime (value) {
+  // ensure the object is valid by running the built-in isostring.
   const timezoneOffset = -value.getTimezoneOffset()
   const direction = timezoneOffset >= 0 ? '+' : '-'
   const pad = (num) => {
     const floored = Math.floor(Math.abs(num))
-    return floored < 10 ? '0' : '0'
+    const prefix = floored < 10 ? '0' : ''
+    return `${prefix}${floored}`
   }
   // value.toISOString() but with relative timestamp instead of Z.
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(
     value.getDate()
   )}T${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(
     value.getSeconds()
-  )}${direction}${timezoneOffset / 60}:${timezoneOffset % 60}`
+  )}${direction}${pad(timezoneOffset / 60)}${pad(timezoneOffset % 60)}`
 }
 
 function stringifyInlineArray (values) {
